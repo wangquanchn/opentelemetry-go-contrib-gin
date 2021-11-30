@@ -39,9 +39,6 @@ const (
 // The service parameter should describe the name of the (virtual)
 // server handling the request.
 func Middleware(service string, opts ...Option) gin.HandlerFunc {
-	fmt.Println(service)
-
-
 	cfg := config{}
 	for _, opt := range opts {
 		opt.apply(&cfg)
@@ -57,6 +54,8 @@ func Middleware(service string, opts ...Option) gin.HandlerFunc {
 		cfg.Propagators = otel.GetTextMapPropagator()
 	}
 	return func(c *gin.Context) {
+		parentServiceName := c.Request.Header.Get("parentServiceName")
+
 		c.Set(tracerKey, tracer)
 		savedCtx := c.Request.Context()
 		defer func() {
@@ -68,6 +67,7 @@ func Middleware(service string, opts ...Option) gin.HandlerFunc {
 			oteltrace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(c.Request)...),
 			oteltrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest(service, c.FullPath(), c.Request)...),
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
+			oteltrace.WithAttributes(attribute.Key("parent_service.name").String(parentServiceName)),
 		}
 		spanName := c.FullPath()
 		if spanName == "" {
